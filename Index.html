@@ -1,0 +1,217 @@
+
+<!DOCTYPE html>
+<html lang="fa">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>VOID RUNNER</title>
+<style>
+* { box-sizing: border-box; }
+body {
+  margin: 0; background: #08060f; color: #eee;
+  font-family: Arial, sans-serif; text-align: center;
+  min-height: 100vh; display: flex; align-items: center;
+  justify-content: center; padding: 16px;
+}
+.game {
+  width: 100%; max-width: 720px; padding: 18px;
+  background: linear-gradient(145deg,#171025,#09070e);
+  border: 1px solid #7541a8; border-radius: 20px;
+  box-shadow: 0 0 35px #812bff22;
+}
+h1 { margin: 0; letter-spacing: 5px; color: #c99aff; }
+.subtitle { color: #9e8bb5; font-size: 12px; margin: 8px; }
+.stats {
+  display: flex; justify-content: space-around;
+  margin: 18px 0; font-size: 14px;
+}
+.stats b { color: #d5a9ff; }
+canvas {
+  display: block; width: 100%; height: auto;
+  background: #0c0915; border: 1px solid #39254f;
+  border-radius: 12px; touch-action: manipulation;
+}
+button {
+  margin-top: 16px; padding: 13px 28px; border: 0;
+  border-radius: 12px; background: #a855f7; color: white;
+  font-size: 16px; font-weight: bold; cursor: pointer;
+}
+.hint { color: #9b8ba9; font-size: 12px; line-height: 2; }
+</style>
+</head>
+<body>
+<div class="game">
+  <h1>VOID RUNNER</h1>
+  <div class="subtitle">ENTER THE VOID · RUN FOR YOUR RECORD</div>
+
+  <div class="stats">
+    <span>SCORE: <b id="score">0</b></span>
+    <span>BEST: <b id="best">0</b></span>
+  </div>
+
+  <canvas id="game" width="640" height="260"></canvas>
+  <button id="start">شروع بازی</button>
+  <p class="hint">برای پرش روی بازی بزن یا Space را فشار بده<br>
+  از موانع فرار کن و رکوردت را بشکن!</p>
+</div>
+
+<script>
+const canvas = document.getElementById("game");
+const ctx = canvas.getContext("2d");
+const scoreEl = document.getElementById("score");
+const bestEl = document.getElementById("best");
+const startBtn = document.getElementById("start");
+
+let best = 0;
+try { best = Number(localStorage.getItem("voidBest")) || 0; } catch(e) {}
+bestEl.textContent = best;
+
+let running = false, over = false;
+let score = 0, speed = 5, frame = 0, obstacles = [];
+const ground = 215;
+const player = { x: 65, y: ground - 38, w: 32, h: 38, vy: 0, jumping: false };
+
+function reset() {
+  score = 0; speed = 5; frame = 0; obstacles = [];
+  player.y = ground - player.h; player.vy = 0;
+  player.jumping = false; over = false; running = true;
+  startBtn.textContent = "شروع دوباره";
+  scoreEl.textContent = "0";
+  requestAnimationFrame(loop);
+}
+
+function jump() {
+  if (!running) {
+    if (over) reset();
+    else reset();
+    return;
+  }
+  if (!player.jumping) {
+    player.vy = -12;
+    player.jumping = true;
+  }
+}
+
+startBtn.addEventListener("click", () => {
+  if (!running) reset();
+  else jump();
+});
+canvas.addEventListener("pointerdown", jump);
+document.addEventListener("keydown", e => {
+  if (e.code === "Space" || e.code === "ArrowUp") {
+    e.preventDefault(); jump();
+  }
+});
+
+function drawPlayer() {
+  const x = player.x, y = player.y;
+  ctx.shadowColor = "#b56cff";
+  ctx.shadowBlur = 14;
+  ctx.fillStyle = "#b56cff";
+  // دایناسور پیکسلی ساده
+  ctx.fillRect(x + 8, y + 8, 22, 20);
+  ctx.fillRect(x + 17, y, 19, 15);
+  ctx.fillRect(x + 28, y + 7, 12, 7);
+  ctx.fillRect(x, y + 15, 10, 7);
+  ctx.fillRect(x + 10, y + 27, 7, 11);
+  ctx.fillRect(x + 25, y + 27, 7, 11);
+  ctx.shadowBlur = 0;
+  ctx.fillStyle = "#10071b";
+  ctx.fillRect(x + 29, y + 4, 3, 3);
+}
+
+function drawObstacle(o) {
+  ctx.shadowColor = "#ff4fd8";
+  ctx.shadowBlur = 10;
+  ctx.fillStyle = "#ff4fd8";
+  ctx.fillRect(o.x, o.y, o.w, o.h);
+  ctx.fillRect(o.x - 5, o.y + 10, 5, 5);
+  ctx.fillRect(o.x + o.w, o.y + 18, 5, 5);
+  ctx.shadowBlur = 0;
+}
+
+function endGame() {
+  running = false; over = true;
+  startBtn.textContent = "دوباره بازی کن";
+  if (score > best) {
+    best = score;
+    bestEl.textContent = best;
+    try { localStorage.setItem("voidBest", best); } catch(e) {}
+  }
+  ctx.fillStyle = "#08060fbb";
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+  ctx.textAlign = "center";
+  ctx.fillStyle = "#e2c2ff";
+  ctx.font = "bold 30px Arial";
+  ctx.fillText("GAME OVER", 320, 115);
+  ctx.font = "16px Arial";
+  ctx.fillText("امتیاز: " + score, 320, 150);
+}
+
+function loop() {
+  if (!running) return;
+  frame++;
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+  // پس‌زمینه‌ی ستاره‌ای
+  for (let i = 0; i < 24; i++) {
+    const x = (i * 97 - frame * 0.3 + 640) % 640;
+    const y = (i * 47) % 175;
+    ctx.fillStyle = "#74549b";
+    ctx.fillRect(x, y, 2, 2);
+  }
+
+  // زمین
+  ctx.strokeStyle = "#8e52c5";
+  ctx.shadowColor = "#8e52c5";
+  ctx.shadowBlur = 8;
+  ctx.beginPath(); ctx.moveTo(0, ground); ctx.lineTo(640, ground);
+  ctx.stroke(); ctx.shadowBlur = 0;
+
+  player.vy += 0.58;
+  player.y += player.vy;
+  if (player.y >= ground - player.h) {
+    player.y = ground - player.h;
+    player.vy = 0; player.jumping = false;
+  }
+
+  if (frame % Math.max(42, Math.floor(90 - speed * 3)) === 0) {
+    const h = 22 + Math.random() * 22;
+    obstacles.push({ x: 650, y: ground - h, w: 15 + Math.random() * 10, h });
+  }
+
+  obstacles.forEach(o => {
+    o.x -= speed;
+    drawObstacle(o);
+
+    if (player.x + player.w - 5 > o.x &&
+        player.x + 5 < o.x + o.w &&
+        player.y + player.h - 4 > o.y) {
+      endGame();
+    }
+  });
+
+  obstacles = obstacles.filter(o => o.x + o.w > 0);
+  drawPlayer();
+
+  if (frame % 6 === 0) {
+    score++;
+    scoreEl.textContent = score;
+    speed = Math.min(10, 5 + score / 250);
+  }
+  requestAnimationFrame(loop);
+}
+
+// صفحه‌ی شروع
+ctx.fillStyle = "#0c0915";
+ctx.fillRect(0, 0, 640, 260);
+ctx.textAlign = "center";
+ctx.fillStyle = "#c99aff";
+ctx.font = "bold 26px Arial";
+ctx.fillText("READY TO RUN?", 320, 115);
+ctx.font = "15px Arial";
+ctx.fillStyle = "#a998ba";
+ctx.fillText("Tap START to enter the VOID", 320, 150);
+</script>
+</body>
+</html>
